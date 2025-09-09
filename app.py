@@ -1,6 +1,7 @@
 import os
-
 from flask import Flask, abort, request, jsonify
+
+from utils import my_handler
 
 app = Flask(__name__)
 
@@ -10,18 +11,35 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 
 @app.route("/perform_query")
 def perform_query():
-    # получить параметры query и file_name из request.args, при ошибке вернуть ошибку 400
+    # Получение параметров
     cmd1 = request.args.get("cmd1")
     val1 = request.args.get("val1")
     cmd2 = request.args.get("cmd2")
     val2 = request.args.get("val2")
     file_name = request.args.get("file_name")
-    if not cmd1 and val1 and file_name:
+    # Проверка обязательных параметров
+    if not all([cmd1, val1, file_name]):
         abort(400, "Необходимо указать: cmd1, val1 и file_name")
+    # Проверка существования файла
     file_path = os.path.join(DATA_DIR, file_name)
-    # проверить, что файл file_name существует в папке DATA_DIR, при ошибке вернуть ошибку 400
     if not os.path.exists(file_path):
-        abort(400, "Указанный файл не найден")
-    # с помощью функционального программирования (функций filter, map), итераторов/генераторов
-    # сконструировать запрос и вернуть пользователю сформированный результат
-    return app.response_class('', content_type="text/plain")
+        abort(404, "Указанный файл не найден")
+
+    try:
+        with open(file_path, "r", encoding='utf-8') as file:
+            data = file.read().splitlines()
+        # Проверка первой команды
+        result = my_handler(cmd1, val1, data)
+        # Проверка второй команды (если указана)
+        if cmd2 and val2:
+            result = my_handler(cmd2, val2, result)
+
+        return jsonify(result)
+
+    except ValueError as e:
+        abort(400, f"Ошибка в параметрах: {str(e)}")
+    except Exception as e:
+        abort(500, f"Внутренняя ошибка сервера: {str(e)}")
+
+if __name__ == "__main__":
+    app.run()
